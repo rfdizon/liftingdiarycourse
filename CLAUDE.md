@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Docs first
+
+Before generating or modifying any code, ALWAYS check the `/docs` directory for a relevant doc file first and follow its guidance. If no relevant doc exists, proceed using the guidance below and general best practices.
+
 ## Project status
 
 This is a freshly bootstrapped Next.js app (via `create-next-app`) for a "lifting diary" course project. It currently contains only the default scaffold (`src/app/layout.tsx`, `src/app/page.tsx`) — no application-specific features, routes, or data layer exist yet.
