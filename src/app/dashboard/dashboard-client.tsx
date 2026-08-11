@@ -1,8 +1,9 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { format, isSameDay } from "date-fns"
-import { CalendarIcon, Dumbbell } from "lucide-react"
+import { CalendarIcon, Dumbbell, Plus } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -56,11 +57,17 @@ export function DashboardClient({
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6 sm:p-10">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          Review the workouts you&apos;ve logged for a given day.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
+            Review the workouts you&apos;ve logged for a given day.
+          </p>
+        </div>
+        <Button render={<Link href="/dashboard/workout/new" />}>
+          <Plus />
+          Log workout
+        </Button>
       </div>
 
       <Popover open={open} onOpenChange={setOpen}>
