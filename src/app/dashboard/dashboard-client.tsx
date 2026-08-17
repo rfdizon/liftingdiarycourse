@@ -64,7 +64,7 @@ export function DashboardClient({
             Review the workouts you&apos;ve logged for a given day.
           </p>
         </div>
-        <Button render={<Link href="/dashboard/workout/new" />}>
+        <Button nativeButton={false} render={<Link href="/dashboard/workout/new" />}>
           <Plus />
           Log workout
         </Button>

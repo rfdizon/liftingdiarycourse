@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/sync-docs-index.cjs",
+            "timeout": 120,
+            "statusMessage": "Syncing docs index in CLAUDE.md..."
+          }
+        ]
+      }
+    ]
+  }
+}

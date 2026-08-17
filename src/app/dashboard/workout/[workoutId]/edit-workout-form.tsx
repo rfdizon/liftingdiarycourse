@@ -29,11 +29,21 @@ import {
   CardTitle,
   CardContent,
 } from "@/components/ui/card"
-import { createWorkout } from "./actions"
+import { updateWorkout } from "./actions"
 
 type Exercise = {
   id: string
   name: string
+}
+
+type ExistingWorkout = {
+  id: string
+  name: string | null
+  startedAt: Date
+  workoutExercises: {
+    exercise: { id: string } | null
+    sets: { weight: string | null; reps: number }[]
+  }[]
 }
 
 type DraftSet = {
@@ -60,13 +70,40 @@ function emptyExercise(): DraftExercise {
   return { key: makeKey(), exerciseId: "", sets: [emptySet()] }
 }
 
-export function NewWorkoutForm({ exercises }: { exercises: Exercise[] }) {
-  const [name, setName] = React.useState("")
-  const [date, setDate] = React.useState<Date>(new Date())
+function draftExercisesFromWorkout(
+  workout: ExistingWorkout
+): DraftExercise[] {
+  if (workout.workoutExercises.length === 0) {
+    return [emptyExercise()]
+  }
+
+  return workout.workoutExercises.map((workoutExercise) => ({
+    key: makeKey(),
+    exerciseId: workoutExercise.exercise?.id ?? "",
+    sets:
+      workoutExercise.sets.length > 0
+        ? workoutExercise.sets.map((set) => ({
+            key: makeKey(),
+            weight: set.weight ?? "",
+            reps: String(set.reps),
+          }))
+        : [emptySet()],
+  }))
+}
+
+export function EditWorkoutForm({
+  workout,
+  exercises,
+}: {
+  workout: ExistingWorkout
+  exercises: Exercise[]
+}) {
+  const [name, setName] = React.useState(workout.name ?? "")
+  const [date, setDate] = React.useState<Date>(workout.startedAt)
   const [datePopoverOpen, setDatePopoverOpen] = React.useState(false)
   const [draftExercises, setDraftExercises] = React.useState<
     DraftExercise[]
-  >([emptyExercise()])
+  >(() => draftExercisesFromWorkout(workout))
   const [error, setError] = React.useState<string | null>(null)
   const [isPending, startTransition] = React.useTransition()
 
@@ -154,6 +191,7 @@ export function NewWorkoutForm({ exercises }: { exercises: Exercise[] }) {
     }
 
     const payload = {
+      workoutId: workout.id,
       name: name.trim().length > 0 ? name.trim() : null,
       startedAt: date,
       exercises: draftExercises.map((exercise) => ({
@@ -167,10 +205,10 @@ export function NewWorkoutForm({ exercises }: { exercises: Exercise[] }) {
 
     startTransition(async () => {
       try {
-        await createWorkout(payload)
+        await updateWorkout(payload)
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Failed to create workout."
+          err instanceof Error ? err.message : "Failed to update workout."
         )
       }
     })
@@ -180,10 +218,10 @@ export function NewWorkoutForm({ exercises }: { exercises: Exercise[] }) {
     <div className="flex flex-1 flex-col gap-6 p-6 sm:p-10">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">
-          New workout
+          Edit workout
         </h1>
         <p className="text-sm text-muted-foreground">
-          Log a workout with its exercises and sets.
+          Update this workout&apos;s exercises and sets.
         </p>
       </div>
 
@@ -369,7 +407,7 @@ export function NewWorkoutForm({ exercises }: { exercises: Exercise[] }) {
 
         <div className="flex items-center gap-2">
           <Button type="submit" disabled={isPending}>
-            {isPending ? "Saving..." : "Save workout"}
+            {isPending ? "Saving..." : "Save changes"}
           </Button>
           <Button
             type="button"

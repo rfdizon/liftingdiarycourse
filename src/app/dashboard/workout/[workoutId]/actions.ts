@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { createWorkoutForCurrentUser } from "@/data/workouts";
+import { updateWorkoutForCurrentUser } from "@/data/workouts";
 
 // Postgres's `uuid` column only checks the 32-hex-digit shape, not the
 // RFC 4122 version/variant nibbles, so we match that instead of Zod's
@@ -14,7 +14,8 @@ const uuidLike = z
     message: "Invalid UUID",
   });
 
-const createWorkoutSchema = z.object({
+const updateWorkoutSchema = z.object({
+  workoutId: uuidLike,
   name: z.string().trim().min(1).nullable(),
   startedAt: z.date(),
   exercises: z
@@ -32,12 +33,12 @@ const createWorkoutSchema = z.object({
     .min(1, "Add at least one exercise"),
 });
 
-export async function createWorkout(
-  input: z.infer<typeof createWorkoutSchema>
+export async function updateWorkout(
+  input: z.infer<typeof updateWorkoutSchema>
 ) {
-  const validated = createWorkoutSchema.parse(input);
+  const { workoutId, ...validated } = updateWorkoutSchema.parse(input);
 
-  await createWorkoutForCurrentUser(validated);
+  await updateWorkoutForCurrentUser(workoutId, validated);
 
   redirect("/dashboard");
 }

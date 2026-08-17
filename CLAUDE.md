@@ -19,6 +19,19 @@ This is a freshly bootstrapped Next.js app (via `create-next-app`) for a "liftin
 
 There is no test runner configured yet.
 
+## Code Generation Guidelines
+
+Documentation files in `/docs` (see "Docs first" above for how to use them):
+
+- [`docs/auth.md`](docs/auth.md) — authentication and authorization standards (Clerk only).
+- [`docs/data-fetching.md`](docs/data-fetching.md) — data fetching standards (must happen in server components).
+- [`docs/data-mutations.md`](docs/data-mutations.md) — data mutation (create/update/delete) standards.
+- [`docs/routing.md`](docs/routing.md) — routing standards (all app functionality under `/dashboard`, protected via middleware).
+- [`docs/server-components.md`](docs/server-components.md) — Server Component standards for this Next.js 15 app.
+- [`docs/ui.md`](docs/ui.md) — UI coding standards (shadcn/ui only).
+
+This list is kept in sync automatically by the `docs-index-updater` subagent whenever a file is added to `/docs`.
+
 ## Architecture
 
 - Next.js App Router (`src/app/`), TypeScript, React 19.
