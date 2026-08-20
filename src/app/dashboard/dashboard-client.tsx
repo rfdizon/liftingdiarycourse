@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { format, isSameDay } from "date-fns"
 import { CalendarIcon, Dumbbell } from "lucide-react"
 
@@ -106,36 +107,42 @@ export function DashboardClient({
           </Card>
         ) : (
           workoutsForDate.map((workout) => (
-            <Card key={workout.id}>
-              <CardHeader>
-                <CardTitle>{workout.name ?? "Workout"}</CardTitle>
-                <CardDescription>
-                  Started at {format(workout.startedAt, "p")}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                {workout.exercises.map((exercise, index) => (
-                  <div key={exercise.id} className="flex flex-col gap-2">
-                    {index > 0 && <Separator className="mb-2" />}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">
-                        {exercise.name}
-                      </span>
-                      <Badge variant="secondary">
-                        {exercise.sets.length} sets
-                      </Badge>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {exercise.sets.map((set) => (
-                        <Badge key={set.id} variant="outline">
-                          {set.weight}kg × {set.reps}
+            <Link
+              key={workout.id}
+              href={`/dashboard/workout/${workout.id}`}
+              className="block rounded-xl transition-colors hover:bg-accent/50"
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle>{workout.name ?? "Workout"}</CardTitle>
+                  <CardDescription>
+                    Started at {format(workout.startedAt, "p")}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  {workout.exercises.map((exercise, index) => (
+                    <div key={exercise.id} className="flex flex-col gap-2">
+                      {index > 0 && <Separator className="mb-2" />}
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">
+                          {exercise.name}
+                        </span>
+                        <Badge variant="secondary">
+                          {exercise.sets.length} sets
                         </Badge>
-                      ))}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {exercise.sets.map((set) => (
+                          <Badge key={set.id} variant="outline">
+                            {set.weight}kg × {set.reps}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+                  ))}
+                </CardContent>
+              </Card>
+            </Link>
           ))
         )}
       </div>
