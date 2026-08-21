@@ -32,3 +32,31 @@ export async function getWorkoutsForCurrentUser() {
     },
   });
 }
+
+/**
+ * Fetches a single workout (with exercises and sets) by id, scoped to the
+ * currently authenticated user. Returns `undefined` if the workout does not
+ * exist or does not belong to the current user.
+ */
+export async function getWorkoutByIdForCurrentUser(workoutId: string) {
+  const { userId } = await auth();
+
+  if (!userId) {
+    throw new Error("Not authenticated");
+  }
+
+  return db.query.workouts.findFirst({
+    where: { id: workoutId, userId },
+    with: {
+      workoutExercises: {
+        orderBy: { order: "asc" },
+        with: {
+          exercise: true,
+          sets: {
+            orderBy: { setNumber: "asc" },
+          },
+        },
+      },
+    },
+  });
+}
