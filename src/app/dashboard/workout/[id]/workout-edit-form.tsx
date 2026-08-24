@@ -17,6 +17,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Card,
   CardHeader,
   CardTitle,
@@ -32,9 +39,28 @@ export type EditableSet = {
 }
 
 export type EditableExercise = {
+  key: string
+  id?: string
+  exerciseId: string
+  name?: string
+  sets: EditableSet[]
+}
+
+type AvailableExercise = {
   id: string
   name: string
-  sets: EditableSet[]
+}
+
+function makeKey() {
+  return Math.random().toString(36).slice(2)
+}
+
+function emptySet(): EditableSet {
+  return { key: makeKey(), weight: "", reps: "" }
+}
+
+function emptyExercise(): EditableExercise {
+  return { key: makeKey(), exerciseId: "", sets: [emptySet()] }
 }
 
 export function WorkoutEditForm({
@@ -42,11 +68,13 @@ export function WorkoutEditForm({
   initialName,
   initialStartedAt,
   initialExercises,
+  availableExercises,
 }: {
   workoutId: string
   initialName: string | null
   initialStartedAt: Date
   initialExercises: EditableExercise[]
+  availableExercises: AvailableExercise[]
 }) {
   const router = useRouter()
   const [name, setName] = React.useState(initialName ?? "")
@@ -57,13 +85,13 @@ export function WorkoutEditForm({
   const [error, setError] = React.useState<string | null>(null)
 
   function updateSet(
-    exerciseId: string,
+    exerciseKey: string,
     setKey: string,
     changes: Partial<EditableSet>
   ) {
     setExercises((current) =>
       current.map((exercise) =>
-        exercise.id !== exerciseId
+        exercise.key !== exerciseKey
           ? exercise
           : {
               ...exercise,
@@ -75,26 +103,20 @@ export function WorkoutEditForm({
     )
   }
 
-  function addSet(exerciseId: string) {
+  function addSet(exerciseKey: string) {
     setExercises((current) =>
       current.map((exercise) =>
-        exercise.id !== exerciseId
+        exercise.key !== exerciseKey
           ? exercise
-          : {
-              ...exercise,
-              sets: [
-                ...exercise.sets,
-                { key: `new-${crypto.randomUUID()}`, weight: "", reps: "" },
-              ],
-            }
+          : { ...exercise, sets: [...exercise.sets, emptySet()] }
       )
     )
   }
 
-  function removeSet(exerciseId: string, setKey: string) {
+  function removeSet(exerciseKey: string, setKey: string) {
     setExercises((current) =>
       current.map((exercise) =>
-        exercise.id !== exerciseId
+        exercise.key !== exerciseKey
           ? exercise
           : {
               ...exercise,
@@ -104,28 +126,65 @@ export function WorkoutEditForm({
     )
   }
 
-  function removeExercise(exerciseId: string) {
+  function removeExercise(exerciseKey: string) {
     setExercises((current) =>
-      current.filter((exercise) => exercise.id !== exerciseId)
+      current.filter((exercise) => exercise.key !== exerciseKey)
+    )
+  }
+
+  function addExercise() {
+    setExercises((current) => [...current, emptyExercise()])
+  }
+
+  function updateExerciseSelection(exerciseKey: string, exerciseId: string) {
+    setExercises((current) =>
+      current.map((exercise) =>
+        exercise.key === exerciseKey ? { ...exercise, exerciseId } : exercise
+      )
     )
   }
 
   async function handleSave() {
-    setIsSaving(true)
     setError(null)
+
+    for (const exercise of exercises) {
+      if (!exercise.exerciseId) {
+        setError("Choose an exercise for every row, or remove it.")
+        return
+      }
+      for (const set of exercise.sets) {
+        if (!set.reps || Number.isNaN(Number(set.reps))) {
+          setError("Every set needs a rep count.")
+          return
+        }
+      }
+    }
+
+    setIsSaving(true)
     try {
       await updateWorkoutAction(workoutId, {
         name: name.trim() === "" ? null : name.trim(),
         startedAt,
-        exercises: exercises.map((exercise) => ({
-          id: exercise.id,
-          sets: exercise.sets.map((set, index) => ({
-            id: set.id,
-            setNumber: index + 1,
-            weight: set.weight.trim() === "" ? null : set.weight.trim(),
-            reps: Number.parseInt(set.reps, 10) || 0,
-          })),
-        })),
+        exercises: exercises.map((exercise) =>
+          exercise.id
+            ? {
+                id: exercise.id,
+                sets: exercise.sets.map((set, index) => ({
+                  id: set.id,
+                  setNumber: index + 1,
+                  weight: set.weight.trim() === "" ? null : set.weight.trim(),
+                  reps: Number.parseInt(set.reps, 10) || 0,
+                })),
+              }
+            : {
+                exerciseId: exercise.exerciseId,
+                sets: exercise.sets.map((set, index) => ({
+                  setNumber: index + 1,
+                  weight: set.weight.trim() === "" ? null : set.weight.trim(),
+                  reps: Number.parseInt(set.reps, 10) || 0,
+                })),
+              }
+        ),
       })
       router.refresh()
     } catch (err) {
@@ -134,6 +193,10 @@ export function WorkoutEditForm({
       setIsSaving(false)
     }
   }
+
+  const usedExerciseIds = new Set(
+    exercises.map((exercise) => exercise.exerciseId).filter(Boolean)
+  )
 
   return (
     <Card>
@@ -192,16 +255,44 @@ export function WorkoutEditForm({
 
         <div className="flex flex-col gap-4">
           {exercises.map((exercise, index) => (
-            <div key={exercise.id} className="flex flex-col gap-2">
+            <div key={exercise.key} className="flex flex-col gap-2">
               {index > 0 && <Separator className="mb-2" />}
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">{exercise.name}</span>
+              <div className="flex items-center justify-between gap-4">
+                {exercise.id ? (
+                  <span className="text-sm font-medium">{exercise.name}</span>
+                ) : (
+                  <div className="flex flex-1 flex-col gap-1.5">
+                    <Select
+                      value={exercise.exerciseId}
+                      onValueChange={(value) =>
+                        updateExerciseSelection(exercise.key, value as string)
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select an exercise" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableExercises
+                          .filter(
+                            (option) =>
+                              !usedExerciseIds.has(option.id) ||
+                              option.id === exercise.exerciseId
+                          )
+                          .map((option) => (
+                            <SelectItem key={option.id} value={option.id}>
+                              {option.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  aria-label={`Remove ${exercise.name}`}
-                  onClick={() => removeExercise(exercise.id)}
+                  aria-label={`Remove ${exercise.name ?? "exercise"}`}
+                  onClick={() => removeExercise(exercise.key)}
                 >
                   <Trash2 />
                 </Button>
@@ -220,7 +311,7 @@ export function WorkoutEditForm({
                       className="w-24"
                       value={set.weight}
                       onChange={(event) =>
-                        updateSet(exercise.id, set.key, {
+                        updateSet(exercise.key, set.key, {
                           weight: event.target.value,
                         })
                       }
@@ -237,7 +328,7 @@ export function WorkoutEditForm({
                       className="w-20"
                       value={set.reps}
                       onChange={(event) =>
-                        updateSet(exercise.id, set.key, {
+                        updateSet(exercise.key, set.key, {
                           reps: event.target.value,
                         })
                       }
@@ -249,7 +340,8 @@ export function WorkoutEditForm({
                       variant="ghost"
                       size="icon-sm"
                       aria-label={`Remove set ${setIndex + 1}`}
-                      onClick={() => removeSet(exercise.id, set.key)}
+                      onClick={() => removeSet(exercise.key, set.key)}
+                      disabled={exercise.sets.length === 1}
                     >
                       <Trash2 />
                     </Button>
@@ -260,7 +352,7 @@ export function WorkoutEditForm({
                   variant="outline"
                   size="sm"
                   className="w-fit"
-                  onClick={() => addSet(exercise.id)}
+                  onClick={() => addSet(exercise.key)}
                 >
                   <Plus />
                   Add set
@@ -268,6 +360,16 @@ export function WorkoutEditForm({
               </div>
             </div>
           ))}
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-fit"
+            onClick={addExercise}
+          >
+            <Plus />
+            Add exercise
+          </Button>
         </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}

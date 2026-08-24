@@ -133,10 +133,9 @@ export type UpdateWorkoutSetInput = {
   reps: number;
 };
 
-export type UpdateWorkoutExerciseInput = {
-  id: string;
-  sets: UpdateWorkoutSetInput[];
-};
+export type UpdateWorkoutExerciseInput =
+  | { id: string; exerciseId?: undefined; sets: UpdateWorkoutSetInput[] }
+  | { id?: undefined; exerciseId: string; sets: UpdateWorkoutSetInput[] };
 
 export type UpdateWorkoutInput = {
   name: string | null;
@@ -173,71 +172,104 @@ export async function updateWorkoutForCurrentUser(
     throw new Error("Workout not found");
   }
 
-  await db
-    .update(workouts)
-    .set({
-      name: input.name,
-      startedAt: input.startedAt,
-      updatedAt: new Date(),
-    })
-    .where(eq(workouts.id, workoutId));
+  return db.transaction(async (tx) => {
+    await tx
+      .update(workouts)
+      .set({
+        name: input.name,
+        startedAt: input.startedAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(workouts.id, workoutId));
 
-  const keptExerciseIds = new Set(
-    input.exercises.map((exercise) => exercise.id)
-  );
-  const exerciseIdsToRemove = existing.workoutExercises
-    .filter((workoutExercise) => !keptExerciseIds.has(workoutExercise.id))
-    .map((workoutExercise) => workoutExercise.id);
-
-  if (exerciseIdsToRemove.length > 0) {
-    await db
-      .delete(workoutExercises)
-      .where(inArray(workoutExercises.id, exerciseIdsToRemove));
-  }
-
-  for (const exerciseInput of input.exercises) {
-    const originalExercise = existing.workoutExercises.find(
-      (workoutExercise) => workoutExercise.id === exerciseInput.id
+    const keptExerciseIds = new Set(
+      input.exercises.flatMap((exercise) => (exercise.id ? [exercise.id] : []))
     );
+    const exerciseIdsToRemove = existing.workoutExercises
+      .filter((workoutExercise) => !keptExerciseIds.has(workoutExercise.id))
+      .map((workoutExercise) => workoutExercise.id);
 
-    if (!originalExercise) {
-      continue;
+    if (exerciseIdsToRemove.length > 0) {
+      await tx
+        .delete(workoutExercises)
+        .where(inArray(workoutExercises.id, exerciseIdsToRemove));
     }
 
-    const originalSetIds = new Set(
-      originalExercise.sets.map((set) => set.id)
-    );
-    const keptSetIds = new Set(
-      exerciseInput.sets
-        .filter((set) => set.id && originalSetIds.has(set.id))
-        .map((set) => set.id as string)
-    );
-    const setIdsToRemove = originalExercise.sets
-      .filter((set) => !keptSetIds.has(set.id))
-      .map((set) => set.id);
+    let nextOrder =
+      existing.workoutExercises.length > 0
+        ? Math.max(
+            ...existing.workoutExercises.map((workoutExercise) => workoutExercise.order)
+          ) + 1
+        : 0;
 
-    if (setIdsToRemove.length > 0) {
-      await db.delete(sets).where(inArray(sets.id, setIdsToRemove));
-    }
+    for (const exerciseInput of input.exercises) {
+      if (exerciseInput.id === undefined) {
+        const [workoutExercise] = await tx
+          .insert(workoutExercises)
+          .values({
+            workoutId,
+            exerciseId: exerciseInput.exerciseId,
+            order: nextOrder++,
+          })
+          .returning();
 
-    for (const setInput of exerciseInput.sets) {
-      if (setInput.id && originalSetIds.has(setInput.id)) {
-        await db
-          .update(sets)
-          .set({
+        if (exerciseInput.sets.length > 0) {
+          await tx.insert(sets).values(
+            exerciseInput.sets.map((set) => ({
+              workoutExerciseId: workoutExercise.id,
+              setNumber: set.setNumber,
+              weight: set.weight,
+              reps: set.reps,
+            }))
+          );
+        }
+
+        continue;
+      }
+
+      const originalExercise = existing.workoutExercises.find(
+        (workoutExercise) => workoutExercise.id === exerciseInput.id
+      );
+
+      if (!originalExercise) {
+        continue;
+      }
+
+      const originalSetIds = new Set(
+        originalExercise.sets.map((set) => set.id)
+      );
+      const keptSetIds = new Set(
+        exerciseInput.sets
+          .filter((set) => set.id && originalSetIds.has(set.id))
+          .map((set) => set.id as string)
+      );
+      const setIdsToRemove = originalExercise.sets
+        .filter((set) => !keptSetIds.has(set.id))
+        .map((set) => set.id);
+
+      if (setIdsToRemove.length > 0) {
+        await tx.delete(sets).where(inArray(sets.id, setIdsToRemove));
+      }
+
+      for (const setInput of exerciseInput.sets) {
+        if (setInput.id && originalSetIds.has(setInput.id)) {
+          await tx
+            .update(sets)
+            .set({
+              setNumber: setInput.setNumber,
+              weight: setInput.weight,
+              reps: setInput.reps,
+            })
+            .where(eq(sets.id, setInput.id));
+        } else {
+          await tx.insert(sets).values({
+            workoutExerciseId: exerciseInput.id,
             setNumber: setInput.setNumber,
             weight: setInput.weight,
             reps: setInput.reps,
-          })
-          .where(eq(sets.id, setInput.id));
-      } else {
-        await db.insert(sets).values({
-          workoutExerciseId: exerciseInput.id,
-          setNumber: setInput.setNumber,
-          weight: setInput.weight,
-          reps: setInput.reps,
-        });
+          });
+        }
       }
     }
-  }
+  });
 }
